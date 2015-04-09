@@ -9,7 +9,7 @@ import org.apache.spark.sql.SQLContext
  * Just initializes some dummy data into a table.
  */
 object SqlLoaderJob extends SparkSqlJob {
-  case class Address(first: String, last: String, street: String, city: String)
+  case class Address(firstName: String, lastName: String, street: String, city: String)
 
   val addresses = Seq(
     Address("Bob", "Charles", "101 A St.", "San Jose"),
@@ -20,9 +20,9 @@ object SqlLoaderJob extends SparkSqlJob {
   def validate(sql: SQLContext, config: Config): SparkJobValidation = SparkJobValid
 
   def runJob(sql: SQLContext, config: Config): Any = {
-    import sql.createSchemaRDD
+    import sql.implicits._
     val addrRdd = sql.sparkContext.parallelize(addresses)
-    addrRdd.registerTempTable("addresses")
+    addrRdd.toDF().registerTempTable("addresses")
     addrRdd.count()
   }
 }

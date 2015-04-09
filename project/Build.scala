@@ -1,11 +1,8 @@
 import sbt._
 import Keys._
 import sbtassembly.Plugin._
-import AssemblyKeys._
 import spray.revolver.RevolverPlugin._
-import spray.revolver.Actions
 import com.typesafe.sbt.SbtScalariform._
-import org.scalastyle.sbt.ScalastylePlugin
 import scalariform.formatter.preferences._
 import bintray.Plugin.bintrayPublishSettings
 
@@ -51,7 +48,10 @@ object JobServerBuild extends Build {
       javaOptions in Revolver.reStart += "-XX:MaxPermSize=256m",
       javaOptions in Revolver.reStart += "-Djava.security.krb5.realm= -Djava.security.krb5.kdc=",
       // This lets us add Spark back to the classpath without assembly barfing
-      fullClasspath in Revolver.reStart := (fullClasspath in Compile).value
+      fullClasspath in Revolver.reStart := (fullClasspath in Compile).value,
+      // Must run the examples and tests in separate JVMs to avoid mysterious
+      // scala.reflect.internal.MissingRequirementError errors. (TODO)
+      fork in Test := true
       ) ++ publishSettings
   ) dependsOn(akkaApp, jobServerApi)
 
@@ -74,6 +74,7 @@ object JobServerBuild extends Build {
     id = "root", base = file("."),
     settings =
       commonSettings210 ++ ourReleaseSettings ++ Seq(
+      // Must run Spark tests sequentially because they compete for port 4040!
       parallelExecution in Test := false,
       publishArtifact := false,
       concurrentRestrictions := Seq(
@@ -95,13 +96,13 @@ object JobServerBuild extends Build {
 
   lazy val commonSettings210 = Defaults.defaultSettings ++ dirSettings ++ implicitlySettings ++ Seq(
     organization := "spark.jobserver",
-    crossPaths   := false,
-    scalaVersion := "2.10.4",
-    scalaBinaryVersion := "2.10",
+    crossPaths   := true,
+    crossScalaVersions := Seq("2.10.4","2.11.6"),
     publishTo    := Some(Resolver.file("Unused repo", file("target/unusedrepo"))),
 
+    // scalastyleFailOnError := true,
     runScalaStyle := {
-      org.scalastyle.sbt.PluginKeys.scalastyle.toTask("").value
+      org.scalastyle.sbt.ScalastylePlugin.scalastyle.in(Compile).toTask("").value
     },
     (compile in Compile) <<= (compile in Compile) dependsOn runScalaStyle,
 
@@ -120,14 +121,12 @@ object JobServerBuild extends Build {
         <exclude module="jmxtools"/>
         <exclude module="jmxri"/>
       </dependencies>
-  ) ++ scalariformPrefs ++ ScalastylePlugin.Settings ++ scoverageSettings
+  ) ++ scalariformPrefs ++ scoverageSettings
 
   lazy val scoverageSettings = {
-    import ScoverageSbtPlugin._
-    instrumentSettings ++ Seq(
-      // Semicolon-separated list of regexs matching classes to exclude
-      ScoverageKeys.excludedPackages in scoverage := ".+Benchmark.*"
-    )
+    import scoverage.ScoverageSbtPlugin
+    // Semicolon-separated list of regexs matching classes to exclude
+    ScoverageSbtPlugin.ScoverageKeys.coverageExcludedPackages := ".+Benchmark.*"
   }
 
   lazy val publishSettings = bintrayPublishSettings ++ Seq(

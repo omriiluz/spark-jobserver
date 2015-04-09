@@ -19,6 +19,7 @@ class JobSqlDAO(config: Config) extends JobDAO {
   logger.info("rootDir is " + rootDirFile.getAbsolutePath)
 
   // Definition of the tables
+  //scalastyle:off
   class Jars(tag: Tag) extends Table[(Int, String, Timestamp, Array[Byte])](tag, "JARS") {
     def jarId = column[Int]("JAR_ID", O.PrimaryKey, O.AutoInc)
     def appName = column[String]("APP_NAME")
@@ -49,6 +50,7 @@ class JobSqlDAO(config: Config) extends JobDAO {
     def jobConfig = column[String]("JOB_CONFIG")
     def * = (jobId, jobConfig)
   }
+  //scalastyle:on
   val configs = TableQuery[Configs]
 
   // DB initialization
@@ -89,7 +91,7 @@ class JobSqlDAO(config: Config) extends JobDAO {
 
   // Check if a single exist
   private def isTableExist(tableName: String)(implicit session: Session): Boolean =
-    !MTable.getTables(tableName).list().isEmpty
+    !MTable.getTables(tableName).list.isEmpty
 
   // Check if "all tables don't exist" is true
   private def isAllTablesNotExist()(implicit session: Session): Boolean =
